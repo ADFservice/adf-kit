@@ -27,7 +27,7 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 atualização do Git
 
 git add .
-git commit -m "Correção do endereço do repositorio"
+git commit -m "Correção do endereço do README.md"
 git branch -M main
 git push -u origin main
 
