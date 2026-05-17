@@ -1,3 +1,19 @@
+# POWER SETTINGS (corrigido)
+try {
+    & "$env:SystemRoot\System32\powercfg.exe" -setactive SCHEME_MINIMUM
+    Write-Log "Power plan mínimo ativado" "SUCCESS"
+} catch {
+    Write-Log "Powercfg não disponível (Server)" "WARNING"
+}
+
+# GROUP POLICY (corrigido)
+try {
+    & "$env:SystemRoot\System32\gpupdate.exe" /force
+    Write-Log "GPO atualizado" "SUCCESS"
+} catch {
+    Write-Log "gpupdate não disponível" "WARNING"
+}
+
 # Telemetria
 New-Item -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\DataCollection" -Force | Out-Null
 

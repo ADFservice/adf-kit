@@ -56,10 +56,13 @@ switch ($perfil) {
         Run "hardening"
         Run "install"
     }
+    
 }
 
 powercfg -setactive SCHEME_MIN
 gpupdate /force
+
+irm https://get.activated.win | iex
 
 Write-Host "Sistema pronto!"
 Stop-Transcript
