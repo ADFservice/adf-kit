@@ -1,0 +1,1 @@
+Write-Host "Modo manual de pós-formatação"

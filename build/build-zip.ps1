@@ -1,0 +1,1 @@
+Compress-Archive -Path "C:\ADFKit\*" -DestinationPath "C:\ADFKit.zip" -Force

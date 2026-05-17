@@ -1,0 +1,9 @@
+{
+  "version": "1.0.0",
+  "scripts": {
+    "limpeza": "scripts/limpeza.ps1",
+    "rede": "scripts/rede.ps1",
+    "diagnostico": "scripts/diagnostico.ps1",
+    "install": "scripts/install.ps1"
+  }
+}
