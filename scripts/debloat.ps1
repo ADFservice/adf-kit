@@ -1,240 +1,143 @@
 #Requires -RunAsAdministrator
-
-# ==========================================
-# ADF KIT - DEBLOAT PROFISSIONAL
-# ==========================================
-
-Write-Host ""
-Write-Host "==========================================" -ForegroundColor Cyan
-Write-Host "      ADF KIT - DEBLOAT WINDOWS" -ForegroundColor Yellow
-Write-Host "==========================================" -ForegroundColor Cyan
-Write-Host ""
-
-# ------------------------------------------
-# APPS QUE PODEM SER REMOVIDOS COM SEGURANÇA
-# ------------------------------------------
-
-$apps = @(
-
-    # Xbox
-    "Microsoft.XboxApp",
-    "Microsoft.XboxGamingOverlay",
-    "Microsoft.XboxIdentityProvider",
-    "Microsoft.XboxSpeechToTextOverlay",
-    "Microsoft.GamingApp",
-
-    # Comunicação
-    "Microsoft.SkypeApp",
-    "MicrosoftTeams",
-
-    # Jogos
-    "Microsoft.MicrosoftSolitaireCollection",
-
-    # Apps promocionais / extras
-    "Microsoft.BingNews",
-    "Microsoft.BingWeather",
-    "Microsoft.GetHelp",
-    "Microsoft.Getstarted",
-    "Microsoft.People",
-    "Microsoft.Todos",
-    "Microsoft.WindowsFeedbackHub",
-    "Microsoft.MicrosoftOfficeHub",
-
-    # Multimídia extra
-    "Microsoft.ZuneMusic",
-    "Microsoft.ZuneVideo",
-
-    # Mixed Reality
-    "Microsoft.MixedReality.Portal",
-
-    # Outros
-    "Clipchamp.Clipchamp"
-    "Microsoft.Windows.Photos"
+param(
+    [string]$Cliente = "Desconhecido",
+    [string]$LogFile = ""
 )
 
-# ------------------------------------------
-# FUNÇÃO DE REMOÇÃO
-# ------------------------------------------
+function Write-Log($Message, $Level = "INFO") {
+    $timestamp = Get-Date -Format "yyyy-MM-dd HH:mm:ss"
+    $logEntry = "[$timestamp] [$Level] $Message"
+    
+    if ($LogFile -and (Test-Path (Split-Path $LogFile))) {
+        Add-Content -Path $LogFile -Value $logEntry -Encoding UTF8
+    }
+    Write-Host $logEntry -ForegroundColor $(switch($Level) { 
+        "ERROR" { "Red" }; "SUCCESS" { "Green" }; "WARNING" { "Yellow" }; default { "Cyan" } 
+    })
+}
 
-function Remove-Bloat {
+Write-Log "=== INICIANDO DEBLOAT para $Cliente ===" "INFO"
+Write-Log "Plataforma: $([Environment]::OSVersion.VersionString)" "INFO"
 
-    param (
-        [string]$AppName
+# DETECTAR PLATAFORMA
+$IsServer = [Environment]::OSVersion.VersionString -match "Server"
+$AppxSupported = $false
+
+try {
+    Import-Module Appx -ErrorAction Stop
+    $AppxSupported = $true
+    Write-Log "✅ Módulo Appx disponível" "SUCCESS"
+} catch {
+    Write-Log "⚠️ Appx não suportado (Server/LTSC). Pulando apps UWP." "WARNING"
+}
+
+# APPS UWP (só se suportado)
+if ($AppxSupported) {
+    Write-Log "Removendo apps UWP..." "INFO"
+    $apps = @(
+        "Microsoft.XboxApp","Microsoft.XboxGamingOverlay","Microsoft.XboxIdentityProvider",
+        "Microsoft.XboxSpeechToTextOverlay","Microsoft.GamingApp","Microsoft.SkypeApp",
+        "MicrosoftTeams","Microsoft.MicrosoftSolitaireCollection","Microsoft.BingNews",
+        "Microsoft.BingWeather","Microsoft.GetHelp","Microsoft.Getstarted","Microsoft.People",
+        "Microsoft.Todos","Microsoft.WindowsFeedbackHub","Microsoft.MicrosoftOfficeHub",
+        "Microsoft.ZuneMusic","Microsoft.ZuneVideo","Microsoft.MixedReality.Portal",
+        "Clipchamp.Clipchamp"
     )
-
-    Write-Host ""
-    Write-Host "Removendo: $AppName" -ForegroundColor Cyan
-
-    # Remove instalado
-    $installed = Get-AppxPackage -Name $AppName -AllUsers
-
-    if ($installed) {
-
-        foreach ($pkg in $installed) {
-
-            try {
-
-                Remove-AppxPackage `
-                    -Package $pkg.PackageFullName `
-                    -ErrorAction Stop
-
-                Write-Host "  [OK] Pacote instalado removido" -ForegroundColor Green
-
-            }
-            catch {
-
-                Write-Host "  [ERRO] Falha ao remover instalado" -ForegroundColor Yellow
-            }
+    
+    foreach ($app in $apps) {
+        Write-Log "  $app" "DarkGray"
+        Get-AppxPackage -Name $app -AllUsers -ErrorAction SilentlyContinue | ForEach-Object {
+            Remove-AppxPackage $_ -ErrorAction SilentlyContinue
         }
-
-    }
-    else {
-
-        Write-Host "  [INFO] Não instalado" -ForegroundColor DarkGray
-    }
-
-    # Remove provisionado
-    $provisioned = Get-AppxProvisionedPackage -Online |
-    Where-Object { $_.DisplayName -eq $AppName }
-
-    if ($provisioned) {
-
-        foreach ($prov in $provisioned) {
-
-            try {
-
-                Remove-AppxProvisionedPackage `
-                    -Online `
-                    -PackageName $prov.PackageName `
-                    -ErrorAction Stop | Out-Null
-
-                Write-Host "  [OK] Provisionamento removido" -ForegroundColor Green
-
-            }
-            catch {
-
-                Write-Host "  [ERRO] Falha ao remover provisionado" -ForegroundColor Yellow
-            }
+        Get-AppxProvisionedPackage -Online | Where-Object DisplayName -eq $app | ForEach-Object {
+            Remove-AppxProvisionedPackage -Online -PackageName $_.PackageName -ErrorAction SilentlyContinue
         }
-
     }
-    else {
+} else {
+    Write-Log "Ignorando apps UWP..." "INFO"
+}
 
-        Write-Host "  [INFO] Não provisionado" -ForegroundColor DarkGray
+# REGISTRO - SEMPRE FUNCIONA
+Write-Log "Aplicando políticas de registro..." "INFO"
+
+$regTweaks = @{
+    "HKLM:\SOFTWARE\Policies\Microsoft\Windows\CloudContent" = @{ "DisableWindowsConsumerFeatures" = 1 }
+    "HKCU:\SOFTWARE\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" = @{ 
+        "SubscribedContent-338388Enabled" = 0
+        "SilentInstalledAppsEnabled" = 0
+        "ContentDeliveryAllowed" = 0
+        "OemPreInstalledAppsEnabled" = 0
+        "PreInstalledAppsEnabled" = 0
+        "PreInstalledAppsEverEnabled" = 0
+    }
+    "HKLM:\SOFTWARE\Policies\Microsoft\WindowsStore" = @{ "AutoDownload" = 2 }
+}
+
+foreach ($path in $regTweaks.Keys) {
+    New-Item $path -Force -ErrorAction SilentlyContinue | Out-Null
+    foreach ($key in $regTweaks[$path].Keys) {
+        try {
+            Set-ItemProperty $path $key $regTweaks[$path][$key] -Type DWord -Force -ErrorAction Stop
+            Write-Log "  ✅ $path : $key" "SUCCESS"
+        } catch {
+            Write-Log "  ⚠️ $path : $key" "WARNING"
+        }
     }
 }
 
-# ------------------------------------------
-# EXECUÇÃO
-# ------------------------------------------
+# TASKS WINDOWS (telemetria, etc)
+Write-Log "Desabilitando tarefas desnecessárias..." "INFO"
+$tasks = @(
+    "\Microsoft\Windows\Application Experience\Microsoft Compatibility Appraiser",
+    "\Microsoft\Windows\Customer Experience Improvement Program\Consolidator",
+    "\Microsoft\Windows\Customer Experience Improvement Program\UsbCeip",
+    "\Microsoft\Windows\DiskDiagnostic\Microsoft-Windows-DiskDiagnosticDataCollector"
+)
 
-foreach ($app in $apps) {
+Get-ScheduledTask $tasks -ErrorAction SilentlyContinue | Disable-ScheduledTask -ErrorAction SilentlyContinue
 
-    Remove-Bloat $app
-}
-
-# ------------------------------------------
-# DESATIVAR REINSTALAÇÃO AUTOMÁTICA
-# ------------------------------------------
-
-Write-Host ""
-Write-Host "Aplicando políticas anti-bloat..." -ForegroundColor Cyan
-
-# Consumer Features
-New-Item `
-    -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\CloudContent" `
-    -Force | Out-Null
-
-New-ItemProperty `
-    -Path "HKLM:\SOFTWARE\Policies\Microsoft\Windows\CloudContent" `
-    -Name "DisableWindowsConsumerFeatures" `
-    -Value 1 `
-    -PropertyType DWord `
-    -Force | Out-Null
-
-# Sugestões
-New-ItemProperty `
-    -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" `
-    -Name "SubscribedContent-338388Enabled" `
-    -Value 0 `
-    -PropertyType DWord `
-    -Force | Out-Null
-
-# Apps sugeridos
-New-ItemProperty `
-    -Path "HKCU:\Software\Microsoft\Windows\CurrentVersion\ContentDeliveryManager" `
-    -Name "SilentInstalledAppsEnabled" `
-    -Value 0 `
-    -PropertyType DWord `
-    -Force | Out-Null
-
-# ------------------------------------------
-# LIMPEZA FINAL
-# ------------------------------------------
-
-Write-Host ""
-Write-Host "Limpando cache residual..." -ForegroundColor Cyan
-
-Get-AppxPackage -AllUsers |
-Where-Object { $_.Name -match "Xbox|Skype|Zune|Bing|Teams" } |
-ForEach-Object {
-
+# SERVIÇOS NÃO ESSENCIAIS
+Write-Log "Configurando serviços..." "INFO"
+$services = @("DiagTrack","dmwappushservice")
+foreach ($svc in $services) {
     try {
-
-        Remove-AppxPackage `
-            -Package $_.PackageFullName `
-            -ErrorAction SilentlyContinue
-
+        Set-Service $svc -StartupType Disabled -ErrorAction SilentlyContinue
+        Write-Log "  ✅ $svc desabilitado" "SUCCESS"
+    } catch {
+        Write-Log "  [IGNORADO] $svc" "DarkGray"
     }
-    catch {}
 }
 
-# ------------------------------------------
-# FINAL
-# ------------------------------------------
+# SUBSTITUA a seção Photo Viewer por esta (linhas finais):
 
-Write-Host ""
-Write-Host "==========================================" -ForegroundColor Cyan
-Write-Host " Debloat concluído com sucesso." -ForegroundColor Green
-Write-Host "==========================================" -ForegroundColor Cyan
-Write-Host ""
+# PHOTO VIEWER CORRIGIDO
+Write-Log "Ativando Photo Viewer clássico..." "INFO"
+$photoExts = @('.jpg','.jpeg','.png','.bmp','.gif','.tiff')
 
-Write-Host ""
-Write-Host "Reativando Windows Photo Viewer..." -ForegroundColor Cyan
+# Criar chave se não existir
+$photoKey = "HKLM:\SOFTWARE\Microsoft\Windows Photo Viewer\Capabilities\FileAssociations"
+if (!(Test-Path $photoKey)) {
+    New-Item -Path $photoKey -Force | Out-Null
+}
 
-$photoViewerReg = @"
+foreach ($ext in $photoExts) {
+    $fullPath = "$photoKey\$ext"
+    try {
+        # Criar property com Name explícito
+        Set-ItemProperty -Path $photoKey -Name $ext -Value "PhotoViewer.FileAssoc.Tiff" -Type String -Force -ErrorAction Stop
+        Write-Log "  ✅ $ext" "SUCCESS"
+    } catch {
+        Write-Log "  ⚠️ $ext : $($_.Exception.Message)" "WARNING"
+    }
+}
 
-Windows Registry Editor Version 5.00
+# LIMPEZA TEMP
+Write-Log "Limpando arquivos temporários..." "INFO"
+Get-ChildItem $env:TEMP -Recurse -Force -ErrorAction SilentlyContinue | Remove-Item -Recurse -Force -ErrorAction SilentlyContinue
 
-[HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows Photo Viewer\Capabilities\FileAssociations]
-".jpg"="PhotoViewer.FileAssoc.Tiff"
-".jpeg"="PhotoViewer.FileAssoc.Tiff"
-".png"="PhotoViewer.FileAssoc.Tiff"
-".bmp"="PhotoViewer.FileAssoc.Tiff"
-".gif"="PhotoViewer.FileAssoc.Tiff"
-
-"@
-
-$tempReg = "$env:TEMP\photoviewer.reg"
-
-$photoViewerReg | Out-File $tempReg -Encoding ASCII
-
-reg import $tempReg
-
-Remove-Item $tempReg -Force
-
-Write-Host "Windows Photo Viewer ativado." -ForegroundColor Green
-
-# OBS:
-# Mantidos propositalmente:
-# - Microsoft Store
-# - Edge
-# - WebView2
-# - Paint
-# - Fotos
-# - Calculadora
-# - Windows Security
-# - Notepad
-#
-# Para evitar quebra do sistema e problemas
-# futuros em suporte técnico.
+Write-Log "🎉 === DEBLOAT CONCLUÍDO COM SUCESSO! ===" "SUCCESS"
+Write-Host "`n" -NoNewline
+Write-Host "==========================================" -ForegroundColor Green
+Write-Host "      DEBLOAT FINALIZADO - $Cliente       " -ForegroundColor Green
+Write-Host "==========================================" -ForegroundColor Green
+Write-Host "Log completo salvo em: $LogFile" -ForegroundColor Cyan
