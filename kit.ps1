@@ -1,252 +1,128 @@
-# =====================================
-# ADF KIT v2.2 - COMPLETO E FUNCIONANDO
-# =====================================
+# ADF KIT v4.0 - SIMPLES E INFALÍVEL
+param()
 
 # ADMIN CHECK
 if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
-    Start-Process powershell.exe `
-        -ArgumentList "-ExecutionPolicy Bypass -WindowStyle Hidden -File `"$PSCommandPath`"" `
-        -Verb RunAs
+    Start-Process powershell.exe -ArgumentList "-ExecutionPolicy Bypass -WindowStyle Hidden -File `"$PSCommandPath`"" -Verb RunAs
     exit
 }
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 
-# Configurações
-$logPath = "C:\ADF-Kit\Logs\"
+# CONFIG
+$logPath = "C:\ADF-Kit\Logs"
 $url = "https://raw.githubusercontent.com/ADFservice/adf-kit/main/pos-formatacao-auto.ps1"
+New-Item -ItemType Directory -Path $logPath -Force -ErrorAction SilentlyContinue | Out-Null
 
-if (!(Test-Path $logPath)) { 
-    New-Item -Path $logPath -ItemType Directory -Force | Out-Null 
-}
-
-# FORM PRINCIPAL
+# FORM
 $form = New-Object Windows.Forms.Form
-$form.Text = "ADF Kit v2.2 - Pós-Formatação"
-$form.Size = New-Object System.Drawing.Size(520, 550)
+$form.Text = "ADF Kit v4.0"
+$form.Size = New-Object Drawing.Size(550, 400)
 $form.StartPosition = "CenterScreen"
-$form.FormBorderStyle = "FixedDialog"
-$form.MaximizeBox = $false
-
-# TÍTULO
-$lblTitulo = New-Object Windows.Forms.Label
-$lblTitulo.Text = "🚀 ADF Kit - Pós-Formatação Inteligente"
-$lblTitulo.Location = New-Object System.Drawing.Point(20, 10)
-$lblTitulo.Size = New-Object System.Drawing.Size(480, 30)
-$lblTitulo.Font = (New-Object System.Drawing.Font("Arial", 12, [System.Drawing.FontStyle]::Bold))
-$lblTitulo.ForeColor = [System.Drawing.Color]::DarkBlue
-$form.Controls.Add($lblTitulo)
 
 # CLIENTE
-$lblCliente = New-Object Windows.Forms.Label
-$lblCliente.Text = "👤 Nome do Cliente:"
-$lblCliente.Location = New-Object System.Drawing.Point(20, 50)
-$lblCliente.Size = New-Object System.Drawing.Size(130, 25)
-$form.Controls.Add($lblCliente)
+$textBox = New-Object System.Windows.Forms.TextBox
+$textBox.Location = New-Object Drawing.Point(120, 20)
+$textBox.Size = New-Object Drawing.Size(400, 30)
+$textBox.Font = New-Object Drawing.Font("Arial", 10)
+$form.Controls.Add($textBox)
 
-$txtCliente = New-Object Windows.Forms.TextBox
-$txtCliente.Location = New-Object System.Drawing.Point(160, 50)
-$txtCliente.Size = New-Object System.Drawing.Size(320, 25)
-$form.Controls.Add($txtCliente)
-
-# BOTÃO TESTE REDE
-$btnTesteRede = New-Object Windows.Forms.Button
-$btnTesteRede.Text = "🧪 Testar Rede"
-$btnTesteRede.Location = New-Object System.Drawing.Point(20, 85)
-$btnTesteRede.Size = New-Object System.Drawing.Size(120, 35)
-$btnTesteRede.BackColor = [System.Drawing.Color]::LightYellow
-$form.Controls.Add($btnTesteRede)
+$labelCliente = New-Object System.Windows.Forms.Label
+$labelCliente.Location = New-Object Drawing.Point(10, 25)
+$labelCliente.Size = New-Object Drawing.Size(100, 20)
+$labelCliente.Text = "Cliente:"
+$form.Controls.Add($labelCliente)
 
 # BOTÃO EXECUTAR
-$btnExecutar = New-Object Windows.Forms.Button
-$btnExecutar.Text = "🚀 EXECUTAR KIT"
-$btnExecutar.Location = New-Object System.Drawing.Point(155, 85)
-$btnExecutar.Size = New-Object System.Drawing.Size(325, 35)
-$btnExecutar.BackColor = [System.Drawing.Color]::LightGreen
-$btnExecutar.Font = (New-Object System.Drawing.Font("Arial", 10, [System.Drawing.FontStyle]::Bold))
-$form.Controls.Add($btnExecutar)
+$button = New-Object System.Windows.Forms.Button
+$button.Location = New-Object Drawing.Point(10, 70)
+$button.Size = New-Object Drawing.Size(510, 50)
+$button.Text = "🚀 EXECUTAR PÓS-FORMATAÇÃO"
+$button.Font = New-Object Drawing.Font("Arial", 14, [Drawing.FontStyle]::Bold)
+$button.BackColor = [Drawing.Color]::LightGreen
+$form.Controls.Add($button)
 
-# STATUS
-$lblStatus = New-Object Windows.Forms.Label
-$lblStatus.Text = "Status: Pronto para executar"
-$lblStatus.Location = New-Object System.Drawing.Point(20, 130)
-$lblStatus.Size = New-Object System.Drawing.Size(480, 80)
-$lblStatus.Font = (New-Object System.Drawing.Font("Consolas", 9))
-$lblStatus.ForeColor = [System.Drawing.Color]::Gray
-$lblStatus.BorderStyle = "FixedSingle"
-$form.Controls.Add($lblStatus)
+# STATUS TEXTBOX
+$statusText = New-Object System.Windows.Forms.TextBox
+$statusText.Location = New-Object Drawing.Point(10, 130)
+$statusText.Size = New-Object Drawing.Size(530, 220)
+$statusText.Multiline = $true
+$statusText.ScrollBars = "Vertical"
+$statusText.ReadOnly = $true
+$statusText.Font = New-Object Drawing.Font("Consolas", 9)
+$statusText.Text = "Status: Pronto"
+$form.Controls.Add($statusText)
 
-# PROGRESSBAR
-$progressBar = New-Object Windows.Forms.ProgressBar
-$progressBar.Location = New-Object System.Drawing.Point(20, 220)
-$progressBar.Size = New-Object System.Drawing.Size(480, 25)
-$progressBar.Style = "Marquee"
-$progressBar.Visible = $false
-$form.Controls.Add($progressBar)
-
-# LOGS
-$lblLogs = New-Object Windows.Forms.Label
-$lblLogs.Text = "📁 Logs salvos em: C:\ADF-Kit\Logs\"
-$lblLogs.Location = New-Object System.Drawing.Point(20, 255)
-$lblLogs.Size = New-Object System.Drawing.Size(480, 20)
-$lblLogs.Font = (New-Object System.Drawing.Font("Arial", 8, [System.Drawing.FontStyle]::Italic))
-$lblLogs.ForeColor = [System.Drawing.Color]::DarkGreen
-$form.Controls.Add($lblLogs)
-
-$btnAbrirLogs = New-Object Windows.Forms.Button
-$btnAbrirLogs.Text = "📂 Abrir Logs"
-$btnAbrirLogs.Location = New-Object System.Drawing.Point(20, 280)
-$btnAbrirLogs.Size = New-Object System.Drawing.Size(120, 30)
-$btnAbrirLogs.BackColor = [System.Drawing.Color]::LightBlue
-$form.Controls.Add($btnAbrirLogs)
-
-# CANCELAR
-$btnCancelar = New-Object Windows.Forms.Button
-$btnCancelar.Text = "⛔ Cancelar"
-$btnCancelar.Location = New-Object System.Drawing.Point(420, 280)
-$btnCancelar.Size = New-Object System.Drawing.Size(80, 30)
-$btnCancelar.BackColor = [System.Drawing.Color]::LightCoral
-$btnCancelar.Enabled = $false
-$form.Controls.Add($btnCancelar)
-
-# VARIÁVEIS GLOBAIS
-$script:processo = $null
-$script:cancelando = $false
+# BOTÃO LOGS
+$btnLogs = New-Object System.Windows.Forms.Button
+$btnLogs.Location = New-Object Drawing.Point(10, 360)
+$btnLogs.Size = New-Object Drawing.Size(100, 30)
+$btnLogs.Text = "📁 Logs"
+$form.Controls.Add($btnLogs)
 
 # FUNÇÃO STATUS
-function Update-Status($texto, $cor = "Gray") {
-    $lblStatus.Text = "$(Get-Date -Format 'HH:mm:ss') - $texto"
-    $lblStatus.ForeColor = $cor
-    $form.Refresh()
-    Start-Sleep -Milliseconds 100
+function Write-Status($text) {
+    $statusText.AppendText("$(Get-Date -Format 'HH:mm:ss'): $text`n")
+    $statusText.SelectionStart = $statusText.TextLength
+    $statusText.ScrollToCaret()
+    [System.Windows.Forms.Application]::DoEvents()
 }
 
-# EVENTO: TESTAR REDE
-$btnTesteRede.Add_Click({
-        Update-Status "Testando conexão..." "Orange"
-    
-        $testes = @(
-            @{Nome = "Internet (Google)"; Url = "http://www.google.com"; Metodo = "Head" }
-            @{Nome = "GitHub"; Url = "https://github.com"; Metodo = "Head" }
-            @{Nome = "Script ADF"; Url = $url; Metodo = "Get" }
-        )
-    
-        $resultados = @()
-        foreach ($teste in $testes) {
-            try {
-                $res = Invoke-WebRequest -Uri $teste.Url -Method $teste.Metodo -TimeoutSec 8 -UseBasicParsing -ErrorAction Stop
-                $resultados += "✅ $($teste.Nome) - OK ($([math]::Round($res.Headers.'Content-Length'[0]/1KB,1)) KB)"
-            }
-            catch {
-                $resultados += "❌ $($teste.Nome) - $($_.Exception.Message.Split("`r`n")[0])"
-            }
-        }
-    
-        Update-Status ($resultados -join "`n") "Blue"
-        [System.Windows.Forms.MessageBox]::Show(($resultados -join "`n"), "Resultado Rede", "OK", "Information")
-    })
-
-# EVENTO: EXECUTAR
-$btnExecutar.Add_Click({
-        $cliente = $txtCliente.Text.Trim()
-        if ([string]::IsNullOrEmpty($cliente)) {
-            [System.Windows.Forms.MessageBox]::Show("Informe o nome do cliente!", "Erro", "OK", "Warning")
+# CLICK EXECUTAR
+$button.Add_Click({
+        $cliente = $textBox.Text.Trim()
+        if (-not $cliente) {
+            [System.Windows.Forms.MessageBox]::Show("Digite o cliente!", "Erro", "OK", "Warning")
             return
         }
     
-        # Preparar
-        $logFile = "$logPath\$cliente-$(Get-Date -Format 'yyyyMMdd-HHmmss').log"
-        $btnExecutar.Enabled = $false
-        $btnCancelar.Enabled = $true
-        $progressBar.Visible = $true
-        $script:cancelando = $false
+        $logFile = Join-Path $logPath "$cliente-$(Get-Date -f 'yyyyMMdd-HHmmss').log"
+        Write-Status "Iniciando para cliente: $cliente"
+        Write-Status "Log: $logFile"
     
-        # PASSO 1: TESTE REDE RÁPIDO
-        Update-Status "1/4 Testando rede..." "Orange"
         try {
-            $null = Invoke-WebRequest -Uri "https://github.com" -TimeoutSec 5 -UseBasicParsing
-        }
-        catch {
-            Update-Status "SEM INTERNET! Conecte-se e tente novamente." "Red"
-            return
-        }
-    
-        # PASSO 2: DOWNLOAD
-        Update-Status "2/4 Baixando script ($([math]::Round((Invoke-WebRequest $url -UseBasicParsing).Content.Length/1KB,1)) KB)..." "Blue"
-        try {
-            $scriptContent = Invoke-WebRequest -Uri $url -TimeoutSec 30 -UseBasicParsing
-            $scriptPath = "$logPath\$cliente-script.ps1"
-            $scriptContent.Content | Out-File $scriptPath -Encoding UTF8
+            # DOWNLOAD
+            Write-Status "Baixando script..."
+            $web = New-Object Net.WebClient
+            $web.Headers.Add("User-Agent", "Mozilla/5.0")
+            $scriptContent = $web.DownloadString($url)
         
-            "`n=== INÍCIO $(Get-Date) ===`nCliente: $cliente" | Out-File $logFile -Encoding UTF8
-            "Script baixado: $scriptPath" | Out-File $logFile -Append -Encoding UTF8
+            $scriptLocal = Join-Path $logPath "$cliente-script.ps1"
+            $scriptContent | Out-File -FilePath $scriptLocal -Encoding UTF8
         
-            Update-Status "✅ Script baixado! 3/4 Executando..." "Green"
-        }
-        catch {
-            Update-Status "ERRO DOWNLOAD: $($_.Exception.Message)" "Red"
-            return
-        }
-    
-        # PASSO 3: EXECUTAR
-        try {
-            $paramString = "-Cliente `"$cliente`" -LogPath `"$logPath`" -LogFile `"$logFile`""
+            "=== $(Get-Date) Cliente: $cliente ===" | Out-File $logFile -Encoding UTF8
+            Write-Status "Script baixado OK"
         
-            $processInfo = New-Object System.Diagnostics.ProcessStartInfo
-            $processInfo.FileName = "powershell.exe"
-            $processInfo.Arguments = "-NoProfile -ExecutionPolicy Bypass -File `"$scriptPath`" $paramString"
-            $processInfo.WindowStyle = "Hidden"
-            $processInfo.UseShellExecute = $false
+            # EXECUTAR
+            Write-Status "Executando..."
+            $arguments = "-ExecutionPolicy Bypass -File `"$scriptLocal`" -Cliente `"$cliente`" -LogFile `"$logFile`""
+            $process = Start-Process -FilePath "powershell.exe" -ArgumentList $arguments -WindowStyle Normal -PassThru
         
-            Update-Status "🔄 Executando pós-formatação..." "Blue"
-            $script:processo = [System.Diagnostics.Process]::Start($processInfo)
-        
-            # Aguardar com timeout
-            if ($script:processo.WaitForExit(600000)) {
-                # 10 minutos
-                $exitCode = $script:processo.ExitCode
-                if ($exitCode -eq 0) {
-                    Update-Status "🎉 SUCESSO! ExitCode: $exitCode | Log: $logFile" "DarkGreen"
-                }
-                else {
-                    Update-Status "⚠️ Concluído com warnings (ExitCode: $exitCode) | Log: $logFile" "Orange"
-                }
+            # MONITORAR
+            while (-not $process.HasExited) {
+                Write-Status "Rodando... PID: $($process.Id)"
+                Start-Sleep 3
+                [System.Windows.Forms.Application]::DoEvents()
             }
-            else {
-                Update-Status "⏰ TIMEOUT (10min) - Finalizando..." "DarkOrange"
-                $script:processo.Kill()
-            }
+        
+            Write-Status "Finalizado! ExitCode: $($process.ExitCode)"
+            "ExitCode: $($process.ExitCode)" | Add-Content $logFile
+        
         }
         catch {
-            Update-Status "ERRO EXECUÇÃO: $($_.Exception.Message)" "Red"
+            Write-Status "ERRO: $($_.Exception.Message)"
         }
         finally {
-            # LIMPEZA
-            if (Test-Path $scriptPath) { Remove-Item $scriptPath -Force }
-            $progressBar.Visible = $false
-            $btnExecutar.Enabled = $true
-            $btnCancelar.Enabled = $false
+            if (Test-Path $scriptLocal) { Remove-Item $scriptLocal -Force -ErrorAction SilentlyContinue }
         }
     })
 
-# CANCELAR
-$btnCancelar.Add_Click({
-        if ($script:processo -and !$script:cancelando) {
-            $script:cancelando = $true
-            $script:processo.Kill()
-            Update-Status "⛔ Cancelado pelo usuário" "DarkRed"
-            $progressBar.Visible = $false
-            $btnExecutar.Enabled = $true
-            $btnCancelar.Enabled = $false
-        }
-    })
-
-# ABRIR LOGS
-$btnAbrirLogs.Add_Click({
+# LOGS
+$btnLogs.Add_Click({
         Start-Process explorer.exe $logPath
     })
 
 # MOSTRAR
-$form.Add_Shown({ $txtCliente.Focus() })
+$textBox.Focus()
 $form.ShowDialog()
