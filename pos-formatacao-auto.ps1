@@ -39,7 +39,7 @@ switch ($perfil) {
         Run "limpeza"
         Run "install"
         Run "debloat"
-        Run "privacy"
+        Run-Script "ADF-Kit-Tweaks
     }
 
     "empresa" {
@@ -47,6 +47,7 @@ switch ($perfil) {
         Run "install"
         Run "debloat"
         Run "hardening"
+        Run-Script "ADF-Kit-Tweaks
     }
 
     "completo" {
@@ -55,6 +56,7 @@ switch ($perfil) {
         Run "privacy"
         Run "hardening"
         Run "install"
+        Run-Script "ADF-Kit-Tweaks
     }
     
 }

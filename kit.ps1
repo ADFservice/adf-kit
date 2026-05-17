@@ -8,8 +8,7 @@ param()
 # AUTO ELEVAÇÃO ADMIN
 # ==========================================
 
-if (-not ([Security.Principal.WindowsPrincipal]
-        [Security.Principal.WindowsIdentity]::GetCurrent()
+if (-not ([Security.Principal.WindowsPrincipal]  [Security.Principal.WindowsIdentity]::GetCurrent()
     ).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
 
     Start-Process powershell.exe `

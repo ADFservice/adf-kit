@@ -179,6 +179,7 @@ switch ($perfil) {
         Run-Script "install"
         Run-Script "debloat"
         Run-Script "privacy"
+        Run-Script "ADF-Kit-Tweaks"
     }
 
     "empresa" {
@@ -188,6 +189,7 @@ switch ($perfil) {
         Run-Script "debloat"
         Run-Script "privacy"
         Run-Script "hardening"
+        Run-Script "ADF-Kit-Tweaks
     }
 
     "completo" {
@@ -196,6 +198,7 @@ switch ($perfil) {
         Run-Script "debloat"
         Run-Script "privacy"
         Run-Script "hardening"
+        Run-Script "ADF-Kit-Tweaks
         Run-Script "install"
     }
 }
