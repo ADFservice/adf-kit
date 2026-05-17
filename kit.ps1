@@ -21,9 +21,9 @@ $btn.Size = "300,40"
 $btn.Location = "50,80"
 
 $btn.Add_Click({
-    $url = "https://raw.githubusercontent.com/SEU_USUARIO/ADF-Kit/main/pos-formatacao-auto.ps1"
-    irm $url | iex
-})
+        $url = "https://raw.githubusercontent.com/ADFservice/adf-kit/main/pos-formatacao-auto.ps1"
+        irm $url | iex
+    })
 
 $form.Controls.Add($btn)
 $form.ShowDialog()

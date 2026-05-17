@@ -1,4 +1,4 @@
-irm https://raw.githubusercontent.com/SEU_USUARIO/ADF-Kit/main/core/updater.ps1 | iex
+irm https://raw.githubusercontent.com/ADFservice/adf-kit/main/core/updater.ps1 | iex
 
 $cliente = Read-Host "Nome do cliente"
 if (-not $cliente) { $cliente = "Padrao" }
@@ -27,7 +27,7 @@ else {
 
 Write-Host "Perfil detectado: $perfil"
 
-$base = "https://raw.githubusercontent.com/SEU_USUARIO/ADF-Kit/main/scripts"
+$base = "https://raw.githubusercontent.com/ADFservice/adf-kit/main/scripts"
 
 function Run($s) {
     Write-Host "Executando $s..."

@@ -93,11 +93,11 @@ ADF-Kit/
     └── build-zip.ps1
 ⚡ Execução rápida
 🔹 Modo Inteligente
-irm https://raw.githubusercontent.com/SEU_USUARIO/ADF-Kit/main/pos-formatacao-auto.ps1 | iex
+irm https://raw.githubusercontent.com/ADFservice/adf-kit/main/pos-formatacao-auto.ps1 | iex
 🔹 Modo Silencioso
-irm https://raw.githubusercontent.com/SEU_USUARIO/ADF-Kit/main/silent.ps1 | iex
+irm https://raw.githubusercontent.com/ADFservice/adf-kit/main/silent.ps1 | iex
 🔹 Loader GUI
-irm https://raw.githubusercontent.com/SEU_USUARIO/ADF-Kit/main/kit.ps1 | iex
+irm https://raw.githubusercontent.com/ADFservice/adf-kit/main/kit.ps1 | iex
 🔧 Requisitos
 Windows 10 ou 11
 PowerShell 5+

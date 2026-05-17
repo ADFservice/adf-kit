@@ -25,7 +25,7 @@ $logFile = "$logPath\silent-$(Get-Date -Format yyyyMMdd-HHmmss).log"
 Start-Transcript -Path $logFile
 
 # BASE
-$base = "https://raw.githubusercontent.com/SEU_USUARIO/ADF-Kit/main/scripts"
+$base = "https://raw.githubusercontent.com/ADFservice/adf-kit/main/scripts"
 
 # HARDWARE
 $ram = [math]::Round(
