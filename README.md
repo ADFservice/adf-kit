@@ -63,8 +63,9 @@ C:\ADFKit\logs
 🔄 Atualização remota
 
 Scripts executados diretamente do GitHub RAW.
-
+```text
 📂 Estrutura do Projeto
+
 ADF-Kit/
 │
 ├── kit.ps1
@@ -91,13 +92,17 @@ ADF-Kit/
 │
 └── build/
     └── build-zip.ps1
+```
 ⚡ Execução rápida
 🔹 Modo Inteligente
 irm https://raw.githubusercontent.com/ADFservice/adf-kit/main/pos-formatacao-auto.ps1 | iex
+
 🔹 Modo Silencioso
 irm https://raw.githubusercontent.com/ADFservice/adf-kit/main/silent.ps1 | iex
+
 🔹 Loader GUI
 irm https://raw.githubusercontent.com/ADFservice/adf-kit/main/kit.ps1 | iex
+
 🔧 Requisitos
 Windows 10 ou 11
 PowerShell 5+
