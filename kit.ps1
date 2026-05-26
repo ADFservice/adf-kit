@@ -1,6 +1,9 @@
+<#
+20260526 00:38:27
 # ==========================================
-# ADF KIT v4.1 - GUI PROFISSIONAL
+# ADF KIT v4.1 - GUI PROFISSIONAL (CORRIGIDO)
 # ==========================================
+#>
 
 param()
 
@@ -8,7 +11,7 @@ param()
 # AUTO ELEVAÇÃO ADMIN
 # ==========================================
 
-if (-not ([Security.Principal.WindowsPrincipal]  [Security.Principal.WindowsIdentity]::GetCurrent()
+if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()
     ).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
 
     Start-Process powershell.exe `
@@ -35,7 +38,7 @@ $cachePath = "$basePath\Cache"
 
 $url = "https://raw.githubusercontent.com/ADFservice/adf-kit/main/pos-formatacao-auto.ps1"
 
-# Criar estrutura
+# Criar estrutura de pastas
 New-Item -ItemType Directory -Path $basePath  -Force -ErrorAction SilentlyContinue | Out-Null
 New-Item -ItemType Directory -Path $logPath   -Force -ErrorAction SilentlyContinue | Out-Null
 New-Item -ItemType Directory -Path $cachePath -Force -ErrorAction SilentlyContinue | Out-Null
@@ -96,7 +99,7 @@ $statusText.ReadOnly = $true
 $statusText.Font = New-Object Drawing.Font("Consolas", 9)
 $statusText.BackColor = [Drawing.Color]::Black
 $statusText.ForeColor = [Drawing.Color]::LightGreen
-$statusText.Text = "ADF KIT PRONTO"
+$statusText.Text = "ADF KIT PRONTO`r`nPreencha o nome do cliente e clique em executar."
 $form.Controls.Add($statusText)
 
 # ==========================================
@@ -134,133 +137,154 @@ $form.Controls.Add($btnExit)
 # ==========================================
 
 function Write-Status($text) {
-
     $timestamp = Get-Date -Format "HH:mm:ss"
-
     $statusText.AppendText("[$timestamp] $text`r`n")
-
     $statusText.SelectionStart = $statusText.TextLength
     $statusText.ScrollToCaret()
-
     [System.Windows.Forms.Application]::DoEvents()
 }
 
 # ==========================================
-# EXECUTAR
+# EXECUTAR PROCESSO
 # ==========================================
 
 $button.Add_Click({
-
         $cliente = $textBox.Text.Trim()
 
+        # Validação do nome
         if (-not $cliente) {
-
             [System.Windows.Forms.MessageBox]::Show(
-                "Digite o nome do cliente.",
-                "ADF KIT",
-                "OK",
-                "Warning"
+                "Digite o nome do cliente antes de continuar.",
+                "ADF KIT - Aviso",
+                [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Warning
             )
-
             return
         }
 
         $button.Enabled = $false
-
         $logFile = Join-Path $logPath "$cliente-$(Get-Date -Format 'yyyyMMdd-HHmmss').log"
-
         $scriptLocal = Join-Path $cachePath "pos-formatacao-auto.ps1"
 
-        Write-Status "Cliente: $cliente"
-        Write-Status "Iniciando download..."
+        Write-Status "=========================================="
+        Write-Status "Cliente informado: $cliente"
+        Write-Status "Iniciando processo..."
 
         try {
+            # Download do script original
+            Write-Status "Baixando script principal..."
+            Invoke-WebRequest -Uri $url -OutFile $scriptLocal -UseBasicParsing -ErrorAction Stop
+            Write-Status "Download concluído com sucesso."
 
-            # ==========================================
-            # DOWNLOAD SCRIPT
-            # ==========================================
+            # --- CORREÇÕES APLICADAS NO SCRIPT BAIXADO ---
+            Write-Status "Ajustando script para compatibilidade..."
 
-            Invoke-WebRequest `
-                -Uri $url `
-                -OutFile $scriptLocal `
-                -UseBasicParsing
+            $conteudoScript = Get-Content $scriptLocal -Raw -ErrorAction Stop
 
-            Write-Status "Download concluído."
-            Write-Status "Script salvo em:"
-            Write-Status $scriptLocal
+            # 1. Adiciona parâmetros para receber Cliente e LogFile (substitui o Read-Host)
+            $parametros = @'
+param(
+    [string]$Cliente,
+    [string]$LogFile
+)
+'@
+            $conteudoScript = $conteudoScript -replace '(\$cliente = Read-Host "Nome do cliente")', "$parametros`r`n`$1"
 
-            # ==========================================
-            # EXECUTAR SCRIPT
-            # ==========================================
+            # Se o parâmetro for passado, usa ele ao invés de perguntar
+            $conteudoScript = $conteudoScript -replace 'if \(-not \$cliente\) \{ \$cliente = "Padrao" \}', 'if (-not $cliente) { $cliente = "Padrao" } else { $cliente = $Cliente }'
 
-            Write-Status "Executando pós-formatação..."
+            # 2. Corrige caminho do log para igualar ao da interface
+            $conteudoScript = $conteudoScript -replace 'C:\\ADFKit\\logs', "`$PSScriptRoot" # Ajuste temporário, depois sobrescreve o Start-Transcript
+            $conteudoScript = $conteudoScript -replace '(Start-Transcript -Path ).*', "`$1`"`$LogFile`""
 
+            # 3. Corrige função inexistente Run-Script → chama a função Run existente
+            $conteudoScript = $conteudoScript -replace 'Run-Script "ADF-Kit-Tweaks', 'Run "ADF-Kit-Tweaks"'
+
+            # 4. Mantém o comando de ativação conforme solicitado (para laboratório/vm)
+
+            # Salva o script corrigido
+            $conteudoScript | Out-File $scriptLocal -Encoding UTF8 -ErrorAction Stop
+            Write-Status "Ajustes finalizados. Executando..."
+
+            # Executa o script passando os parâmetros
             $arguments = @(
-                "-ExecutionPolicy Bypass"
-                "-File `"$scriptLocal`""
-                "-Cliente `"$cliente`""
+                "-ExecutionPolicy Bypass",
+                "-NoProfile",
+                "-File `"$scriptLocal`"",
+                "-Cliente `"$cliente`"",
                 "-LogFile `"$logFile`""
             ) -join " "
 
-            $process = Start-Process `
-                -FilePath "powershell.exe" `
+            $process = Start-Process -FilePath "powershell.exe" `
                 -ArgumentList $arguments `
                 -WindowStyle Normal `
-                -PassThru
+                -PassThru `
+                -ErrorAction Stop
 
-            Write-Status "PID: $($process.Id)"
+            Write-Status "Processo iniciado. PID: $($process.Id)"
             Write-Status "Aguardando finalização..."
 
             $process.WaitForExit()
 
-            Write-Status "Finalizado."
-            Write-Status "ExitCode: $($process.ExitCode)"
-
-            # ==========================================
-            # ABRIR LOG
-            # ==========================================
+            Write-Status "Processo finalizado. Código de saída: $($process.ExitCode)"
 
             if (Test-Path $logFile) {
-
-                Write-Status "Log salvo em:"
-                Write-Status $logFile
+                Write-Status "Log gerado com sucesso em:"
+                Write-Status "$logFile"
             }
+            else {
+                Write-Status "AVISO: Arquivo de log não foi encontrado."
+            }
+
+            [System.Windows.Forms.MessageBox]::Show(
+                "Processo finalizado!`r`nLog salvo em: $logFile",
+                "ADF KIT - Concluído",
+                [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Information
+            )
 
         }
         catch {
-
-            Write-Status "ERRO:"
-            Write-Status $_.Exception.Message
+            $erroMsg = $_.Exception.Message
+            Write-Status "ERRO: $erroMsg"
 
             [System.Windows.Forms.MessageBox]::Show(
-                $_.Exception.Message,
-                "ERRO",
-                "OK",
-                "Error"
+                "Ocorreu um erro:`r`n$erroMsg",
+                "ADF KIT - Erro",
+                [System.Windows.Forms.MessageBoxButtons]::OK,
+                [System.Windows.Forms.MessageBoxIcon]::Error
             )
         }
         finally {
-
             $button.Enabled = $true
+            Write-Status "=========================================="
         }
     })
 
 # ==========================================
-# BOTÃO LOGS
+# ABRIR PASTA DE LOGS
 # ==========================================
 
 $btnLogs.Add_Click({
-
-        Start-Process explorer.exe $logPath
+        if (Test-Path $logPath) {
+            Start-Process explorer.exe $logPath
+        }
+        else {
+            [System.Windows.Forms.MessageBox]::Show("Pasta de logs não encontrada.", "Aviso", 0, 48)
+        }
     })
 
 # ==========================================
-# BOTÃO CACHE
+# ABRIR PASTA DE CACHE
 # ==========================================
 
 $btnCache.Add_Click({
-
-        Start-Process explorer.exe $cachePath
+        if (Test-Path $cachePath) {
+            Start-Process explorer.exe $cachePath
+        }
+        else {
+            [System.Windows.Forms.MessageBox]::Show("Pasta de cache não encontrada.", "Aviso", 0, 48)
+        }
     })
 
 # ==========================================
@@ -268,14 +292,12 @@ $btnCache.Add_Click({
 # ==========================================
 
 $btnExit.Add_Click({
-
         $form.Close()
     })
 
 # ==========================================
-# MOSTRAR
+# INICIAR INTERFACE
 # ==========================================
 
 $textBox.Focus()
-
 [void]$form.ShowDialog()

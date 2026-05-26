@@ -27,7 +27,7 @@ xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 atualização do Git
 
 git add .
-git commit -m "Melhorias no scripts"
+git commit -m "Melhorias novo script!"
 git branch -M main
 git push -u origin main
 

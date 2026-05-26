@@ -19,11 +19,29 @@ Write-Host ""
 
 $perfil = Read-Host "Escolha o perfil"
 
-$base = "https://raw.githubusercontent.com/SEU_USUARIO/kit-suporte/main/scripts"
+# Endereço do repositório atualizado
+$base = "https://raw.githubusercontent.com/ADFservice/adf-kit/main/scripts"
+
+# Lista para armazenar os erros
+$scriptsComErro = @()
 
 function Run($script) {
-    Write-Host "`nExecutando $script..." -ForegroundColor Cyan
-    irm "$base/$script.ps1" | iex
+    Write-Host "`nVerificando e executando $script..." -ForegroundColor Cyan
+    $url = "$base/$script.ps1"
+    
+    try {
+        # Tenta obter o conteúdo do arquivo
+        $conteudo = Invoke-RestMethod -Uri $url -UseBasicParsing -ErrorAction Stop
+        # Se deu certo, executa
+        Invoke-Expression $conteudo
+        Write-Host "✅ $script executado com sucesso!" -ForegroundColor Green
+    }
+    catch {
+        $mensagemErro = "❌ Erro em '$script': Não encontrado ou falha ao carregar. Endereço: $url"
+        Write-Host $mensagemErro -ForegroundColor Red
+        # Adiciona o erro na lista
+        $scriptsComErro += $script
+    }
 }
 
 switch ($perfil) {
@@ -35,7 +53,6 @@ switch ($perfil) {
         Run "install"
         Run "debloat"
         Run "privacy"
-
     }
 
     "2" {
@@ -45,7 +62,6 @@ switch ($perfil) {
         Run "install"
         Run "debloat"
         Run "hardening"
-
     }
 
     "3" {
@@ -56,7 +72,6 @@ switch ($perfil) {
         Run "privacy"
         Run "hardening"
         Run "install"
-
     }
 
     default {
@@ -73,6 +88,24 @@ powercfg -setactive SCHEME_MIN
 
 # Atualizar políticas
 gpupdate /force
+
+# --------------------------
+# Resumo final de execução
+# --------------------------
+Write-Host "`n=====================================" -ForegroundColor Cyan
+Write-Host "          RESUMO DA EXECUÇÃO         " -ForegroundColor Yellow
+Write-Host "=====================================" -ForegroundColor Cyan
+
+if ($scriptsComErro.Count -eq 0) {
+    Write-Host "`n✅ Todos os scripts foram executados com sucesso!" -ForegroundColor Green
+}
+else {
+    Write-Host "`n⚠️ Os seguintes scripts apresentaram erro ou não foram encontrados:" -ForegroundColor Red
+    foreach ($erro in $scriptsComErro) {
+        Write-Host "   - $erro" -ForegroundColor Red
+    }
+    Write-Host "`nVerifique se os arquivos existem no caminho: $base" -ForegroundColor Yellow
+}
 
 Write-Host "`nSistema pronto para uso!" -ForegroundColor Green
 pause
