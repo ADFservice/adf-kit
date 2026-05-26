@@ -95,14 +95,19 @@ ADF-Kit/
 ```
 ⚡ Execução rápida
 🔹 Modo Inteligente
+
+``` PowerShell
 irm https://raw.githubusercontent.com/ADFservice/adf-kit/main/pos-formatacao-auto.ps1 | iex
+```
 
 🔹 Modo Silencioso
+``` PowerShell
 irm https://raw.githubusercontent.com/ADFservice/adf-kit/main/silent.ps1 | iex
-
+```
 🔹 Loader GUI
+``` PowerShell
 irm https://raw.githubusercontent.com/ADFservice/adf-kit/main/kit.ps1 | iex
-
+```
 🔧 Requisitos
 Windows 10 ou 11
 PowerShell 5+

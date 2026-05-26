@@ -144,12 +144,28 @@ function Write-Status($text) {
     [System.Windows.Forms.Application]::DoEvents()
 }
 
+function Get-SafeClientName {
+    param([string]$Name)
+
+    $cleanName = ($Name -replace '[^\w\-\. ]', '').Trim()
+
+    if (-not $cleanName) {
+        $cleanName = 'Padrao'
+    }
+
+    if ($cleanName.Length -gt 50) {
+        $cleanName = $cleanName.Substring(0, 50).TrimEnd()
+    }
+
+    return $cleanName
+}
+
 # ==========================================
 # EXECUTAR PROCESSO
 # ==========================================
 
 $button.Add_Click({
-        $cliente = $textBox.Text.Trim()
+        $cliente = Get-SafeClientName -Name $textBox.Text
 
         # Validação do nome
         if (-not $cliente) {
@@ -165,6 +181,7 @@ $button.Add_Click({
         $button.Enabled = $false
         $logFile = Join-Path $logPath "$cliente-$(Get-Date -Format 'yyyyMMdd-HHmmss').log"
         $scriptLocal = Join-Path $cachePath "pos-formatacao-auto.ps1"
+        $scriptLocalTemp = Join-Path $cachePath "pos-formatacao-auto.ps1.tmp"
 
         Write-Status "=========================================="
         Write-Status "Cliente informado: $cliente"
@@ -173,50 +190,50 @@ $button.Add_Click({
         try {
             # Download do script original
             Write-Status "Baixando script principal..."
-            Invoke-WebRequest -Uri $url -OutFile $scriptLocal -UseBasicParsing -ErrorAction Stop
+            $conteudoScript = irm -Uri $url -ErrorAction Stop
+            if (-not $conteudoScript) {
+                throw "Conteúdo do script remoto está vazio."
+            }
+            $conteudoScript | Set-Content -Path $scriptLocalTemp -Encoding UTF8 -Force -ErrorAction Stop
             Write-Status "Download concluído com sucesso."
 
             # --- CORREÇÕES APLICADAS NO SCRIPT BAIXADO ---
             Write-Status "Ajustando script para compatibilidade..."
 
-            $conteudoScript = Get-Content $scriptLocal -Raw -ErrorAction Stop
-
-            # 1. Adiciona parâmetros para receber Cliente e LogFile (substitui o Read-Host)
-            $parametros = @'
+            # 1. Adiciona parâmetros para receber Cliente e LogFile e substitui o Read-Host
+            if ($conteudoScript -notmatch '^\s*param\(') {
+                $conteudoScript = @"
 param(
     [string]$Cliente,
     [string]$LogFile
 )
-'@
-            $conteudoScript = $conteudoScript -replace '(\$cliente = Read-Host "Nome do cliente")', "$parametros`r`n`$1"
 
-            # Se o parâmetro for passado, usa ele ao invés de perguntar
-            $conteudoScript = $conteudoScript -replace 'if \(-not \$cliente\) \{ \$cliente = "Padrao" \}', 'if (-not $cliente) { $cliente = "Padrao" } else { $cliente = $Cliente }'
+$conteudoScript
+"@
+            }
 
-            # 2. Corrige caminho do log para igualar ao da interface
-            $conteudoScript = $conteudoScript -replace 'C:\\ADFKit\\logs', "`$PSScriptRoot" # Ajuste temporário, depois sobrescreve o Start-Transcript
-            $conteudoScript = $conteudoScript -replace '(Start-Transcript -Path ).*', "`$1`"`$LogFile`""
+            $conteudoScript = $conteudoScript -replace '\$cliente\s*=\s*Read-Host\s+"Nome do cliente"', '$cliente = $Cliente'
 
-            # 3. Corrige função inexistente Run-Script → chama a função Run existente
-            $conteudoScript = $conteudoScript -replace 'Run-Script "ADF-Kit-Tweaks', 'Run "ADF-Kit-Tweaks"'
+            # 2. Corrige o caminho / formato do log para usar o arquivo informado pela interface
+            $conteudoScript = $conteudoScript -replace 'Start-Transcript\s+-Path\s+.*', 'Start-Transcript -Path $LogFile'
 
-            # 4. Mantém o comando de ativação conforme solicitado (para laboratório/vm)
+            # 3. Mantém o comportamento esperado para ambientes de teste/laboratório
+            # (nenhuma alteração adicional necessária no momento)
 
             # Salva o script corrigido
-            $conteudoScript | Out-File $scriptLocal -Encoding UTF8 -ErrorAction Stop
+            $conteudoScript | Set-Content -Path $scriptLocalTemp -Encoding UTF8 -Force -ErrorAction Stop
+            Move-Item -Path $scriptLocalTemp -Destination $scriptLocal -Force -ErrorAction Stop
             Write-Status "Ajustes finalizados. Executando..."
 
             # Executa o script passando os parâmetros
-            $arguments = @(
-                "-ExecutionPolicy Bypass",
-                "-NoProfile",
-                "-File `"$scriptLocal`"",
-                "-Cliente `"$cliente`"",
-                "-LogFile `"$logFile`""
-            ) -join " "
-
             $process = Start-Process -FilePath "powershell.exe" `
-                -ArgumentList $arguments `
+                -ArgumentList @(
+                "-ExecutionPolicy", "Bypass",
+                "-NoProfile",
+                "-File", $scriptLocal,
+                "-Cliente", $cliente,
+                "-LogFile", $logFile
+            ) `
                 -WindowStyle Normal `
                 -PassThru `
                 -ErrorAction Stop

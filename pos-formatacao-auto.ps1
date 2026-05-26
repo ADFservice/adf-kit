@@ -29,6 +29,15 @@ New-Item -ItemType Directory -Path $logPath -Force | Out-Null
 
 Start-Transcript -Path "$logPath\$cliente-$(Get-Date -Format yyyyMMdd-HHmm).log"
 
+# ✅ 4.1. GARANTE EXECUTÁVEIS DO WINDOWS NO PATH
+$system32 = Join-Path $env:SystemRoot 'System32'
+$sysWOW64 = Join-Path $env:SystemRoot 'SysWOW64'
+foreach ($dir in @($system32, $sysWOW64)) {
+    if (Test-Path $dir -and ($env:PATH -split ';' -notcontains $dir)) {
+        $env:PATH = "$dir;$env:PATH"
+    }
+}
+
 Clear-Host
 Write-Host "ADF KIT - MODO INTELIGENTE"
 
@@ -61,10 +70,15 @@ $base = "https://raw.githubusercontent.com/ADFservice/adf-kit/main/scripts"
 function Run($s) {
     Write-Host "Executando $s..."
     try {
-        irm "$base/$s.ps1" -ErrorAction Stop | iex
+        $scriptContent = irm "$base/$s.ps1" -ErrorAction Stop
+        if ([string]::IsNullOrWhiteSpace($scriptContent)) {
+            throw "Conteúdo remoto vazio."
+        }
+        iex $scriptContent
     }
     catch {
         Write-Host "⚠️ Aviso: Não foi possível executar '$s'. Continuando...`n" -ForegroundColor Red
+        Write-Host "Detalhe: $($_.Exception.Message)" -ForegroundColor Yellow
     }
 }
 
