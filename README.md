@@ -1,71 +1,61 @@
-ADF-Kit
+# ADF-Kit
 
-Kit de automação para pós-formatação, manutenção e provisionamento de computadores Windows utilizando PowerShell.
+Kit de automação para pós-formatação, manutenção e provisionamento de computadores Windows com PowerShell.
 
-O projeto foi desenvolvido com foco em:
+## 🎯 Escopo
 
-padronização de atendimentos técnicos
-automação de tarefas repetitivas
-instalação rápida de utilitários
-limpeza e otimização do sistema
-redução de telemetria e recursos intrusivos
-execução local ou remota via GitHub RAW
-🚀 Recursos
-🧹 Limpeza automática
-%TEMP%
-C:\Windows\Temp
-Prefetch
-cache do Windows Update
-arquivos temporários
-limpeza final do sistema
-📦 Instalação automática de utilitários
+Este repositório consolida scripts de manutenção e provisionamento para uso técnico em ambientes Windows. O fluxo atual privilegia execução remota via `irm`, cache local e GUI para atendimento rápido.
 
-Utilizando Winget:
+## 🧩 Componentes principais
 
-Google Chrome
-Python
-PuTTY
-Adobe Acrobat Reader
-AnyDesk
+### `kit.ps1`
 
-Além de:
+- interface gráfica para execução assistida
+- coleta do nome do cliente
+- prepara o log por atendimento
+- consulta o updater antes de executar o fluxo principal
+- reutiliza o cache local quando a versão está atualizada
+- baixa o script remoto somente quando necessário
 
-atalho automático para WhatsApp Web
-🔐 Privacidade e Hardening
-redução de telemetria
-desativação de serviços de coleta
-desativação do Copilot
-desativação de sugestões e experiências do consumidor
-ajustes seguros de privacidade
-🧠 Detecção inteligente de perfil
+### `pos-formatacao-auto.ps1`
 
-O sistema detecta automaticamente:
+- fluxo principal de execução automatizada
+- aplica rotinas de limpeza, hardening, privacidade e provisionamento
+- utiliza scripts auxiliares em `scripts/`
+- executa comandos do sistema com PATH corrigido para localizar utilitários do Windows
 
-quantidade de RAM
-SSD/HDD
-domínio corporativo
+### `silent.ps1`
 
-E escolhe automaticamente o perfil:
+- execução sem interface
+- útil para uso automatizado ou testes
 
-doméstico
-empresa
-completo
-🖥️ Interface gráfica
+### `core/updater.ps1`
 
-Modo GUI simples para facilitar o uso durante atendimentos.
+- compara a versão remota com a versão local
+- decide se o cache deve ser reutilizado ou atualizado
+- grava o arquivo local de versão em `config/version.json`
 
-🧾 Logs automáticos
+### `scripts/install.ps1`
 
-Geração de logs por atendimento:
+- instala e valida `winget`
+- eleva o processo automaticamente quando necessário
+- trata instalação do Microsoft Store em LTSC
+- verifica aplicativos já instalados antes de reinstalar
+- cria atalho de WhatsApp Web
 
-C:\ADFKit\logs
+## 🔄 Fluxo operacional
 
-🔄 Atualização remota
+1. `kit.ps1` inicia a GUI.
+2. O usuário informa o cliente.
+3. O script valida a versão com `core/updater.ps1`.
+4. Se a versão estiver atualizada, usa o script local em cache.
+5. Se houver atualização, baixa o script remoto e atualiza o cache.
+6. O script principal é executado com `Cliente` e `LogFile`.
+7. O log é salvo em `C:\ADF-Kit\Logs`.
 
-Scripts executados diretamente do GitHub RAW.
+## 🧱 Estrutura do projeto
+
 ```text
-📂 Estrutura do Projeto
-
 ADF-Kit/
 │
 ├── kit.ps1
@@ -93,66 +83,114 @@ ADF-Kit/
 └── build/
     └── build-zip.ps1
 ```
-⚡ Execução rápida
-🔹 Modo Inteligente
 
-``` PowerShell
+## 🛠️ Execução
+
+### Modo GUI
+
+```powershell
+irm https://raw.githubusercontent.com/ADFservice/adf-kit/main/kit.ps1 | iex
+```
+
+### Modo inteligente
+
+```powershell
 irm https://raw.githubusercontent.com/ADFservice/adf-kit/main/pos-formatacao-auto.ps1 | iex
 ```
 
-🔹 Modo Silencioso
-``` PowerShell
+### Modo silencioso
+
+```powershell
 irm https://raw.githubusercontent.com/ADFservice/adf-kit/main/silent.ps1 | iex
 ```
-🔹 Loader GUI
-``` PowerShell
-irm https://raw.githubusercontent.com/ADFservice/adf-kit/main/kit.ps1 | iex
-```
-🔧 Requisitos
-Windows 10 ou 11
-PowerShell 5+
-Winget instalado
-Execução como Administrador
-Conexão com internet
-🛡️ Segurança
 
-O projeto executa scripts remotos via:
+## 📁 Diretórios gerados
 
-irm URL | iex
+- `C:\ADF-Kit\Cache` — cache dos scripts baixados
+- `C:\ADF-Kit\Logs` — logs por atendimento
+- `C:\ADF-Kit\config` — versão local persistida
 
-Recomenda-se:
+## 🔧 Requisitos
 
-utilizar apenas repositórios próprios/confiáveis
-validar alterações antes de publicar
-manter backups dos scripts
-implementar validação de hash futuramente
-📌 Objetivo do Projeto
+- Windows 10 ou 11
+- PowerShell 5+ ou PowerShell 7
+- `winget` disponível para o fluxo de instalação
+- permissão administrativa para operações de sistema
+- acesso à internet
 
-Este projeto foi criado para uso técnico e automação de pós-formatação, buscando:
+## 🧪 Comportamento de instalação
 
-ganho de produtividade
-padronização
-redução de tempo em atendimentos
-centralização de scripts e ferramentas
-⚠️ Aviso
+`scripts/install.ps1` realiza as seguintes ações:
 
-Utilize por sua conta e risco.
+- valida se o processo está elevado
+- tenta elevar automaticamente quando necessário
+- detecta LTSC via SKU e caption
+- instala o Microsoft Store quando aplicável
+- valida o instalador baixado do Winget
+- verifica se o aplicativo já está instalado
+- instala utilitários via `winget`
+- cria atalho para WhatsApp Web
+- atualiza apps instalados quando aplicável
 
-Apesar do projeto buscar segurança e estabilidade, alterações em:
+## 🔐 Segurança e uso
 
-serviços
-registro
-telemetria
-aplicativos do Windows
+- o fluxo atual utiliza `irm` para baixar scripts remotos
+- o cache local é reutilizado quando a versão está atualizada
+- o uso de scripts remotos deve ser restrito a repositórios confiáveis
+- revise o conteúdo antes de executar em ambientes críticos
 
-podem afetar ambientes específicos.
+## 📌 Observações técnicas
 
-Recomenda-se:
+- o `kit.ps1` mantém o comportamento de execução com parâmetros `Cliente` e `LogFile`
+- o updater usa `config/version.json` como referência local
+- `pos-formatacao-auto.ps1` corrige o `PATH` para garantir resolução de ferramentas do sistema
+- `scripts/install.ps1` não depende de estado do shell para elevação; ele se reinicia via `powershell.exe -Verb RunAs` quando necessário
 
-testar em ambiente controlado
-criar ponto de restauração
-manter backup do sistema
-📄 Licença
+## ⚠️ Aviso operacional
 
-Uso pessoal/técnico.
-Adapte conforme sua necessidade.
+Este kit altera configurações de sistema, serviços, privacidade e aplicativos. Antes de uso em produção:
+
+- teste em ambiente controlado
+- crie snapshot ou restore point
+- valide compatibilidade com o hardware e a imagem alvo
+- confirme que o conteúdo remoto está aprovado
+
+## 🧰 Troubleshooting
+
+### `winget` não encontrado
+
+- valide se o `winget` está instalado e disponível no PATH
+- reinicie o PowerShell após instalação
+- execute `scripts/install.ps1` novamente
+
+### Falha de elevação
+
+- confirme que o terminal foi iniciado como administrador
+- o script `scripts/install.ps1` tenta elevar automaticamente
+- se o UAC bloquear a execução, valide permissões do usuário
+
+### Erro ao baixar scripts remotos
+
+- confirme conectividade com internet
+- valide se o endpoint do GitHub RAW está acessível
+- verifique se a URL do repositório foi alterada
+
+### `powercfg` / `gpupdate` não encontrados
+
+- o fluxo principal ajusta o `PATH` para incluir `System32` e `SysWOW64`
+- se o erro persistir, valide se o ambiente executa em Windows completo
+
+### Cache inválido ou versão divergente
+
+- apague `C:\ADF-Kit\Cache` ou `config/version.json` para forçar atualização
+- execute novamente `kit.ps1`
+
+### Log não gerado
+
+- valide se `C:\ADF-Kit\Logs` existe
+- confirme se o script foi executado com permissões adequadas
+- verifique o terminal ou a janela do processo filho
+
+## 📄 Licença
+
+Uso pessoal/técnico. Ajuste conforme sua necessidade.

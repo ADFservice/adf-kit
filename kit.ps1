@@ -33,13 +33,16 @@ Add-Type -AssemblyName System.Drawing
 # ==========================================
 
 $basePath = "C:\ADF-Kit"
+$configPath = Join-Path $basePath "config"
 $logPath = "$basePath\Logs"
 $cachePath = "$basePath\Cache"
+$versionFile = Join-Path $configPath "version.json"
 
 $url = "https://raw.githubusercontent.com/ADFservice/adf-kit/main/pos-formatacao-auto.ps1"
 
 # Criar estrutura de pastas
 New-Item -ItemType Directory -Path $basePath  -Force -ErrorAction SilentlyContinue | Out-Null
+New-Item -ItemType Directory -Path $configPath -Force -ErrorAction SilentlyContinue | Out-Null
 New-Item -ItemType Directory -Path $logPath   -Force -ErrorAction SilentlyContinue | Out-Null
 New-Item -ItemType Directory -Path $cachePath -Force -ErrorAction SilentlyContinue | Out-Null
 
@@ -160,6 +163,26 @@ function Get-SafeClientName {
     return $cleanName
 }
 
+function Invoke-ScriptPatch {
+    param([string]$Content)
+
+    if ($Content -notmatch '^\s*param\(') {
+        $Content = @"
+param(
+    [string]$Cliente,
+    [string]$LogFile
+)
+
+$Content
+"@
+    }
+
+    $Content = $Content -replace '\$cliente\s*=\s*Read-Host\s+"Nome do cliente"', '$cliente = $Cliente'
+    $Content = $Content -replace 'Start-Transcript\s+-Path\s+.*', 'Start-Transcript -Path $LogFile'
+
+    return $Content
+}
+
 # ==========================================
 # EXECUTAR PROCESSO
 # ==========================================
@@ -188,42 +211,44 @@ $button.Add_Click({
         Write-Status "Iniciando processo..."
 
         try {
-            # Download do script original
-            Write-Status "Baixando script principal..."
-            $conteudoScript = irm -Uri $url -ErrorAction Stop
-            if (-not $conteudoScript) {
-                throw "Conteúdo do script remoto está vazio."
+            $needsUpdate = $false
+            try {
+                $updateState = & (Join-Path $PSScriptRoot 'core\updater.ps1') -LocalVersionFile $versionFile -ReturnState
+                if ($updateState -and $updateState.PSObject.Properties['NeedsUpdate']) {
+                    $needsUpdate = [bool]$updateState.NeedsUpdate
+                }
             }
-            $conteudoScript | Set-Content -Path $scriptLocalTemp -Encoding UTF8 -Force -ErrorAction Stop
-            Write-Status "Download concluído com sucesso."
-
-            # --- CORREÇÕES APLICADAS NO SCRIPT BAIXADO ---
-            Write-Status "Ajustando script para compatibilidade..."
-
-            # 1. Adiciona parâmetros para receber Cliente e LogFile e substitui o Read-Host
-            if ($conteudoScript -notmatch '^\s*param\(') {
-                $conteudoScript = @"
-param(
-    [string]$Cliente,
-    [string]$LogFile
-)
-
-$conteudoScript
-"@
+            catch {
+                Write-Status "Não foi possível validar a versão remota. Tentando usar cache local."
             }
 
-            $conteudoScript = $conteudoScript -replace '\$cliente\s*=\s*Read-Host\s+"Nome do cliente"', '$cliente = $Cliente'
+            $conteudoScript = $null
 
-            # 2. Corrige o caminho / formato do log para usar o arquivo informado pela interface
-            $conteudoScript = $conteudoScript -replace 'Start-Transcript\s+-Path\s+.*', 'Start-Transcript -Path $LogFile'
+            if ($needsUpdate -or -not (Test-Path $scriptLocal)) {
+                Write-Status "Baixando script principal..."
+                $conteudoScript = irm -Uri $url -ErrorAction Stop
+                if (-not $conteudoScript) {
+                    throw "Conteúdo do script remoto está vazio."
+                }
 
-            # 3. Mantém o comportamento esperado para ambientes de teste/laboratório
-            # (nenhuma alteração adicional necessária no momento)
+                Write-Status "Download concluído com sucesso."
+                Write-Status "Ajustando script para compatibilidade..."
+                $conteudoScript = Invoke-ScriptPatch -Content $conteudoScript
+                $conteudoScript | Set-Content -Path $scriptLocalTemp -Encoding UTF8 -Force -ErrorAction Stop
+                Move-Item -Path $scriptLocalTemp -Destination $scriptLocal -Force -ErrorAction Stop
 
-            # Salva o script corrigido
-            $conteudoScript | Set-Content -Path $scriptLocalTemp -Encoding UTF8 -Force -ErrorAction Stop
-            Move-Item -Path $scriptLocalTemp -Destination $scriptLocal -Force -ErrorAction Stop
-            Write-Status "Ajustes finalizados. Executando..."
+                if ($needsUpdate) {
+                    & (Join-Path $PSScriptRoot 'core\updater.ps1') -LocalVersionFile $versionFile | Out-Null
+                }
+
+                Write-Status "Ajustes finalizados. Executando..."
+            }
+            else {
+                Write-Status "Usando script local em cache."
+                $conteudoScript = Get-Content -Path $scriptLocal -Raw -ErrorAction Stop
+                $conteudoScript = Invoke-ScriptPatch -Content $conteudoScript
+                $conteudoScript | Set-Content -Path $scriptLocal -Encoding UTF8 -Force -ErrorAction Stop
+            }
 
             # Executa o script passando os parâmetros
             $process = Start-Process -FilePath "powershell.exe" `
