@@ -1,7 +1,7 @@
 # Executar como admin
 if (-not ([Security.Principal.WindowsPrincipal] 
-[Security.Principal.WindowsIdentity]::GetCurrent()
-).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
+        [Security.Principal.WindowsIdentity]::GetCurrent()
+    ).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
 
     Start-Process powershell "-ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs
     exit
@@ -57,7 +57,7 @@ if ($confirm -eq "s") {
 }
 
 # 🌐 Base scripts
-$base = "https://raw.githubusercontent.com/SEU_USUARIO/kit-suporte/main/scripts"
+$base = "https://raw.githubusercontent.com/ADFservice/adf-kit/main/scripts"
 
 function Run($script) {
     Write-Host "`nExecutando $script..." -ForegroundColor Cyan

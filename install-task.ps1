@@ -1,6 +1,7 @@
 # ==========================================
 # ADF KIT - INSTALL TASK
 # Cria tarefa automática pós-formatação
+# Versão 2.1 - Corrigida e Otimizada
 # ==========================================
 
 #Requires -RunAsAdministrator
@@ -8,19 +9,15 @@
 # ==========================================
 # CONFIGURAÇÕES
 # ==========================================
-
 $basePath = "C:\ADF-Kit"
-$scriptPath = "$basePath\silent.ps1"
-
-# URL RAW
+$scriptPath = Join-Path $basePath "silent.ps1"
 $url = "https://raw.githubusercontent.com/ADFservice/adf-kit/main/silent.ps1"
+$nomeTarefa = "ADFKit"
 
 # ==========================================
-# HEADER
+# CABEÇALHO
 # ==========================================
-
 Clear-Host
-
 Write-Host ""
 Write-Host "==========================================" -ForegroundColor Cyan
 Write-Host "      ADF KIT - INSTALL TASK" -ForegroundColor Yellow
@@ -28,163 +25,132 @@ Write-Host "==========================================" -ForegroundColor Cyan
 Write-Host ""
 
 # ==========================================
-# ADMIN CHECK
+# VERIFICAÇÃO DE PERMISSÃO ADMINISTRATIVA
 # ==========================================
-
 if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()
     ).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
 
-    Write-Host "Executando como administrador..."
-
+    Write-Host "🔑 Solicitando permissão de Administrador..."
     Start-Process powershell.exe `
         -ArgumentList "-ExecutionPolicy Bypass -File `"$PSCommandPath`"" `
-        -Verb RunAs
-
+        -Verb RunAs -Wait
     exit
 }
 
 # ==========================================
-# INTERNET
+# VERIFICAÇÃO DE CONEXÃO
 # ==========================================
-
-Write-Host "Verificando internet..."
-
-$internet = Test-Connection google.com -Quiet -Count 1
-
-if (-not $internet) {
-
-    Write-Host ""
-    Write-Host "Sem internet." -ForegroundColor Red
-    pause
-    exit
-}
-
-Write-Host "Internet OK." -ForegroundColor Green
-
-# ==========================================
-# ESTRUTURA
-# ==========================================
-
-Write-Host ""
-Write-Host "Criando estrutura..."
-
-New-Item `
-    -ItemType Directory `
-    -Path $basePath `
-    -Force `
-    -ErrorAction SilentlyContinue | Out-Null
-
-# ==========================================
-# DOWNLOAD SILENT.PS1
-# ==========================================
-
-Write-Host ""
-Write-Host "Baixando silent.ps1..."
-
+Write-Host "🌐 Verificando conexão com a internet..."
 try {
-
-    Invoke-WebRequest `
-        -Uri $url `
-        -OutFile $scriptPath `
-        -UseBasicParsing
-
-    Write-Host "Download concluído." -ForegroundColor Green
+    $null = Test-Connection google.com -Quiet -Count 1 -ErrorAction Stop
+    Write-Host "✅ Conexão OK." -ForegroundColor Green
 }
 catch {
-
-    Write-Host ""
-    Write-Host "Falha no download." -ForegroundColor Red
-    Write-Host $_.Exception.Message
-
-    pause
-    exit
+    Write-Host "❌ ERRO: Sem conexão com a internet. Não é possível continuar." -ForegroundColor Red
+    Read-Host "Pressione Enter para sair"
+    exit 1
 }
 
 # ==========================================
-# REMOVER TAREFA ANTIGA
+# CRIA ESTRUTURA DE PASTAS
 # ==========================================
+Write-Host "`n📂 Preparando diretório em: $basePath"
+New-Item -ItemType Directory -Path $basePath -Force -ErrorAction Stop | Out-Null
 
-Write-Host ""
-Write-Host "Verificando tarefa anterior..."
-
+# ==========================================
+# DOWNLOAD DO SCRIPT PRINCIPAL
+# ==========================================
+Write-Host "⬇️ Baixando arquivo silent.ps1 do repositório..."
 try {
-
-    Unregister-ScheduledTask `
-        -TaskName "ADFKit" `
-        -Confirm:$false `
-        -ErrorAction SilentlyContinue
+    Invoke-WebRequest -Uri $url -OutFile $scriptPath -UseBasicParsing -TimeoutSec 20 -ErrorAction Stop
+    
+    if (-not (Test-Path $scriptPath)) { throw "Arquivo não foi criado após o download." }
+    
+    Write-Host "✅ Download concluído com sucesso." -ForegroundColor Green
 }
-catch {}
+catch {
+    Write-Host "❌ FALHA NO DOWNLOAD: $_" -ForegroundColor Red
+    Read-Host "Pressione Enter para sair"
+    exit 1
+}
 
 # ==========================================
-# CRIAR TAREFA
+# REMOVER TAREFA ANTERIOR (SE EXISTIR)
 # ==========================================
+Write-Host "`n🧹 Verificando e removendo tarefa antiga (se houver)..."
+try {
+    $tarefaExistente = Get-ScheduledTask -TaskName $nomeTarefa -ErrorAction SilentlyContinue
+    if ($tarefaExistente) {
+        Unregister-ScheduledTask -TaskName $nomeTarefa -Confirm:$false -ErrorAction Stop
+        Write-Host "→ Tarefa antiga removida."
+    }
+}
+catch {
+    Write-Host "→ Aviso: Não foi possível remover tarefa antiga ou não existia." -ForegroundColor Yellow
+}
 
-Write-Host ""
-Write-Host "Criando tarefa automática..."
+# ==========================================
+# CRIAR NOVA TAREFA AGENDADA
+# ==========================================
+Write-Host "⚙️ Criando nova tarefa agendada..."
 
-$action = New-ScheduledTaskAction `
-    -Execute "powershell.exe" `
-    -Argument "-ExecutionPolicy Bypass -WindowStyle Hidden -File `"$scriptPath`""
+# Definição da Ação: Executar Powershell com parâmetros corretos
+$argumentos = "-ExecutionPolicy Bypass -WindowStyle Hidden -NoProfile -File `"$scriptPath`""
+$action = New-ScheduledTaskAction -Execute "powershell.exe" -Argument $argumentos
 
-$trigger = New-ScheduledTaskTrigger `
-    -AtLogOn
+# Disparador: Executar em todo logon de usuário
+$trigger = New-ScheduledTaskTrigger -AtLogOn
 
-$principal = New-ScheduledTaskPrincipal `
-    -UserId "SYSTEM" `
-    -LogonType ServiceAccount `
-    -RunLevel Highest
+# Configurações: Executar mesmo se usuário não estiver logado, maior prioridade
+$settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -Hidden
+
+# Usuário: Sistema Local (máxima permissão)
+$principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
 
 try {
-
     Register-ScheduledTask `
-        -TaskName "ADFKit" `
+        -TaskName $nomeTarefa `
         -Action $action `
         -Trigger $trigger `
+        -Settings $settings `
         -Principal $principal `
-        -Force | Out-Null
+        -Force `
+        -ErrorAction Stop | Out-Null
 
-    Write-Host ""
+    Write-Host "`n==========================================" -ForegroundColor Cyan
+    Write-Host "✅ TAREFA INSTALADA COM SUCESSO!" -ForegroundColor Green
     Write-Host "==========================================" -ForegroundColor Cyan
-    Write-Host " TAREFA CRIADA COM SUCESSO " -ForegroundColor Green
-    Write-Host "==========================================" -ForegroundColor Cyan
-
-    Write-Host ""
-    Write-Host "A pós-formatação será executada"
-    Write-Host "automaticamente no próximo login."
+    Write-Host "`nA configuração automática ocorrerá:"
+    Write-Host "• Automaticamente na próxima inicialização/logon"
+    Write-Host "• Ou imediatamente se escolher a opção abaixo"
 }
 catch {
-
-    Write-Host ""
-    Write-Host "ERRO ao criar tarefa." -ForegroundColor Red
-    Write-Host $_.Exception.Message
-
-    pause
-    exit
+    Write-Host "❌ ERRO AO CRIAR TAREFA: $_" -ForegroundColor Red
+    Read-Host "Pressione Enter para sair"
+    exit 1
 }
 
 # ==========================================
-# OPCIONAL - EXECUTAR AGORA
+# OPÇÃO DE EXECUÇÃO IMEDIATA
 # ==========================================
-
 Write-Host ""
-$runNow = Read-Host "Executar agora? (S/N)"
+do {
+    $runNow = Read-Host "Deseja executar a configuração AGORA? (S/N)"
+} until ($runNow -match "^[SsNn]$")
 
-if ($runNow -match "S|s") {
-
-    Write-Host ""
-    Write-Host "Executando tarefa..."
-
-    Start-ScheduledTask -TaskName "ADFKit"
-
-    Write-Host "Tarefa iniciada."
+if ($runNow -match "^[Ss]$") {
+    Write-Host "`n▶️ Iniciando processo de configuração..."
+    try {
+        Start-ScheduledTask -TaskName $nomeTarefa -ErrorAction Stop
+        Write-Host "Processo iniciado em segundo plano. Verifique os logs em C:\ADF-Kit\Logs em instantes." -ForegroundColor Cyan
+    }
+    catch {
+        Write-Host "⚠️ Não foi possível iniciar a tarefa automaticamente. Execute manualmente." -ForegroundColor Yellow
+    }
 }
 
 # ==========================================
-# FINAL
+# FINALIZAÇÃO
 # ==========================================
-
-Write-Host ""
-Write-Host "Finalizado."
-
-pause
+Write-Host "`n✅ Instalação finalizada."
+Read-Host "Pressione Enter para fechar"
