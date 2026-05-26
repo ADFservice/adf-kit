@@ -1,5 +1,4 @@
-12#0,
-14 = =========================================
+= =========================================
 # ADF KIT - SILENT MODE
 # Pós-formatação automática inteligente
 # Versão 2.1 - Corrigida e Otimizada
