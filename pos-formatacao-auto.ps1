@@ -9,8 +9,19 @@ function Ensure-RunAs {
         $scriptPath = $PSCommandPath
         if (-not $scriptPath) { $scriptPath = $MyInvocation.MyCommand.Definition }
         $args = @('-NoProfile','-ExecutionPolicy','Bypass','-File',$scriptPath)
-        $pw = (Get-Command powershell.exe -ErrorAction SilentlyContinue)
-        $pwPath = if ($pw) { $pw.Source } else { 'powershell.exe' }
+
+        $pwPath = $null
+        $pw = Get-Command powershell.exe -ErrorAction SilentlyContinue
+        if ($pw) { $pwPath = $pw.Source }
+        elseif (Get-Command pwsh.exe -ErrorAction SilentlyContinue) { $pwPath = (Get-Command pwsh.exe).Source }
+        elseif (Test-Path (Join-Path $PSHOME 'pwsh.exe')) { $pwPath = Join-Path $PSHOME 'pwsh.exe' }
+        elseif (Test-Path (Join-Path $PSHOME 'powershell.exe')) { $pwPath = Join-Path $PSHOME 'powershell.exe' }
+
+        if (-not $pwPath) {
+            Write-Host "❌ Não foi possível localizar PowerShell para reexecutar como administrador." -ForegroundColor Red
+            exit 1
+        }
+
         Start-Process -FilePath $pwPath -ArgumentList $args -Verb RunAs
         exit
     }

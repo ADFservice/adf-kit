@@ -8,18 +8,33 @@
 param()
 
 # ==========================================
-# AUTO ELEVAÇÃO ADMIN
+# AUTO ELEVAÇÃO ADMIN (ROBUSTO)
 # ==========================================
 
-if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()
-    ).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
+function Ensure-RunAs {
+    $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    if (-not $isAdmin) {
+        $scriptPath = $PSCommandPath
+        if (-not $scriptPath) { $scriptPath = $MyInvocation.MyCommand.Definition }
+        $args = @('-NoProfile','-ExecutionPolicy','Bypass','-File',$scriptPath)
 
-    Start-Process powershell.exe `
-        -ArgumentList "-ExecutionPolicy Bypass -WindowStyle Hidden -File `"$PSCommandPath`"" `
-        -Verb RunAs
+        $pwPath = $null
+        $pw = Get-Command powershell.exe -ErrorAction SilentlyContinue
+        if ($pw) { $pwPath = $pw.Source }
+        elseif (Get-Command pwsh.exe -ErrorAction SilentlyContinue) { $pwPath = (Get-Command pwsh.exe).Source }
+        elseif (Test-Path (Join-Path $PSHOME 'pwsh.exe')) { $pwPath = Join-Path $PSHOME 'pwsh.exe' }
+        elseif (Test-Path (Join-Path $PSHOME 'powershell.exe')) { $pwPath = Join-Path $PSHOME 'powershell.exe' }
 
-    exit
+        if (-not $pwPath) {
+            Write-Host "❌ Não foi possível localizar PowerShell para reexecutar como administrador." -ForegroundColor Red
+            exit 1
+        }
+
+        Start-Process -FilePath $pwPath -ArgumentList $args -Verb RunAs
+        exit
+    }
 }
+Ensure-RunAs
 
 # ==========================================
 # BIBLIOTECAS
