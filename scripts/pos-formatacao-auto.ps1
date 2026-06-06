@@ -87,14 +87,43 @@ $base = "https://raw.githubusercontent.com/ADFservice/adf-kit/main/scripts"
 function Run($script) {
     Write-Host "`nExecutando $script..." -ForegroundColor Cyan
     try {
+        # Tentar carregar do repositório remoto
         $scriptContent = irm "$base/$script.ps1" -ErrorAction Stop
         if ([string]::IsNullOrWhiteSpace($scriptContent)) {
             throw "Conteúdo remoto vazio para $script"
         }
+        
+        # Limpar prefixos de log/timestamp que possam ter sido incluídos (e.g., "20260526 00:54:09 ||")
+        $lines = $scriptContent -split "`n"
+        $cleaned = @()
+        foreach ($line in $lines) {
+            # Pular linhas que começam com timestamp (YYYYMMDD HH:MM:SS ||)
+            if ($line -match '^\d{8}\s+\d{2}:\d{2}:\d{2}\s+\|\|') {
+                continue
+            }
+            $cleaned += $line
+        }
+        $scriptContent = $cleaned -join "`n"
+        
+        # Se conteúdo ficou muito pequeno ou vazio após limpeza, tentar local
+        if ($scriptContent.Length -lt 100) {
+            throw "Conteúdo remoto muito pequeno ou corrompido"
+        }
+        
         iex $scriptContent
     }
     catch {
-        Write-Host "⚠️ Aviso: falha ao executar $script - $($_.Exception.Message)" -ForegroundColor Yellow
+        Write-Host "⚠️ Falha no remoto, tentando versão local de $script..." -ForegroundColor Yellow
+        
+        # Fallback: tentar versão local
+        $localScript = Join-Path (Split-Path $PSCommandPath) "$script-local.ps1"
+        if (Test-Path $localScript) {
+            Write-Host "ℹ️ Usando versão local: $localScript" -ForegroundColor Cyan
+            & $localScript -Cliente $cliente -LogFile $transcriptFile
+        }
+        else {
+            Write-Host "❌ Nenhuma versão disponível para $script - continuando..." -ForegroundColor Red
+        }
     }
 }
 

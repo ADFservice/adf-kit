@@ -83,6 +83,22 @@ function Run($s) {
         if ([string]::IsNullOrWhiteSpace($scriptContent)) {
             throw "Conteúdo remoto vazio."
         }
+        
+        # Limpar prefixos de timestamp/log corrompidos
+        $lines = $scriptContent -split "`n"
+        $cleaned = @()
+        foreach ($line in $lines) {
+            if ($line -match '^\d{8}\s+\d{2}:\d{2}:\d{2}\s+\|\|') {
+                continue
+            }
+            $cleaned += $line
+        }
+        $scriptContent = $cleaned -join "`n"
+        
+        if ($scriptContent.Length -lt 100) {
+            throw "Conteúdo remoto corrompido ou muito pequeno"
+        }
+        
         iex $scriptContent
     }
     catch {
