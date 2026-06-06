@@ -1,11 +1,36 @@
-# Executar como admin
-if (-not ([Security.Principal.WindowsPrincipal] 
-        [Security.Principal.WindowsIdentity]::GetCurrent()
-    ).IsInRole([Security.Principal.WindowsBuiltInRole] "Administrator")) {
+# Executar como admin (robusto)
+function Ensure-RunAs {
+    $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    if (-not $isAdmin) {
+        $scriptPath = $PSCommandPath
+        if (-not $scriptPath) { $scriptPath = $MyInvocation.MyCommand.Definition }
+        $args = @('-NoProfile','-ExecutionPolicy','Bypass','-File',$scriptPath)
 
-    Start-Process powershell "-ExecutionPolicy Bypass -File `"$PSCommandPath`"" -Verb RunAs
-    exit
+        $pwPath = $null
+        $pw = Get-Command powershell.exe -ErrorAction SilentlyContinue
+        if ($pw) { $pwPath = $pw.Source }
+        elseif (Get-Command pwsh.exe -ErrorAction SilentlyContinue) { $pwPath = (Get-Command pwsh.exe).Source }
+        elseif (Test-Path (Join-Path $PSHOME 'pwsh.exe')) { $pwPath = Join-Path $PSHOME 'pwsh.exe' }
+        elseif (Test-Path (Join-Path $PSHOME 'powershell.exe')) { $pwPath = Join-Path $PSHOME 'powershell.exe' }
+
+        if (-not $pwPath) {
+            Write-Host "⚠️ Não foi possível localizar PowerShell para reexecutar como administrador." -ForegroundColor Red
+            exit 1
+        }
+
+        Start-Process -FilePath $pwPath -ArgumentList $args -Verb RunAs
+        exit
+    }
 }
+Ensure-RunAs
+
+# Configuração de logs/transcript
+$logPath = "C:\ADFKit\logs"
+New-Item -ItemType Directory -Path $logPath -Force | Out-Null
+$cliente = Read-Host "Nome do cliente (ou Enter para Padrao)"
+if (-not $cliente) { $cliente = "Padrao" }
+$transcriptFile = Join-Path $logPath "$cliente-$(Get-Date -Format yyyyMMdd-HHmmss)-pos-formatacao-auto.log"
+Start-Transcript -Path $transcriptFile -Force
 
 Clear-Host
 Write-Host "=====================================" -ForegroundColor Cyan
@@ -61,7 +86,16 @@ $base = "https://raw.githubusercontent.com/ADFservice/adf-kit/main/scripts"
 
 function Run($script) {
     Write-Host "`nExecutando $script..." -ForegroundColor Cyan
-    irm "$base/$script.ps1" | iex
+    try {
+        $scriptContent = irm "$base/$script.ps1" -ErrorAction Stop
+        if ([string]::IsNullOrWhiteSpace($scriptContent)) {
+            throw "Conteúdo remoto vazio para $script"
+        }
+        iex $scriptContent
+    }
+    catch {
+        Write-Host "⚠️ Aviso: falha ao executar $script - $($_.Exception.Message)" -ForegroundColor Yellow
+    }
 }
 
 # 🚀 Execução por perfil
@@ -97,4 +131,5 @@ powercfg -setactive SCHEME_MIN
 gpupdate /force
 
 Write-Host "`nSistema pronto!" -ForegroundColor Green
+Stop-Transcript
 pause

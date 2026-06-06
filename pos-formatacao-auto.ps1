@@ -2,11 +2,20 @@
 # ADF KIT - MODO INTELIGENTE (VERSÃO CORRIGIDA)
 # ==================================================
 
-# ✅ 1. GARANTE EXECUÇÃO COMO ADMINISTRADOR (resolve erro do Get-PhysicalDisk)
-if (-not ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)) {
-    Start-Process powershell.exe "-File `"$PSCommandPath`"" -Verb RunAs
-    exit
+# ✅ 1. GARANTE EXECUÇÃO COMO ADMINISTRADOR (robusto)
+function Ensure-RunAs {
+    $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    if (-not $isAdmin) {
+        $scriptPath = $PSCommandPath
+        if (-not $scriptPath) { $scriptPath = $MyInvocation.MyCommand.Definition }
+        $args = @('-NoProfile','-ExecutionPolicy','Bypass','-File',$scriptPath)
+        $pw = (Get-Command powershell.exe -ErrorAction SilentlyContinue)
+        $pwPath = if ($pw) { $pw.Source } else { 'powershell.exe' }
+        Start-Process -FilePath $pwPath -ArgumentList $args -Verb RunAs
+        exit
+    }
 }
+Ensure-RunAs
 
 # ✅ 2. SISTEMA DE ATUALIZAÇÃO COM TRATAMENTO DE ERRO (não quebra sem internet)
 try {
